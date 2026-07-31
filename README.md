@@ -1,51 +1,181 @@
-# poker_isomorphisms
- 
-poker_isomorphisms is a Python library for dealing with flop isomorphisms in relation to poker.
-Isomorphic in poker refers to strategically equivalent cards. Isomorphic hands can apply to hole cards or community cards (aka a flop). There are 22100 possible flops out of which 1755 are strategically different.
+# poker-isomorphisms
 
-Example 1) AsKs is strategically identical to AcKc on a Th9h7h flop; therefore, these two hands are isomorphic.
-Example 2) Kh9s3h is strategically identical to Kd9c3d; therefore, these two flops are isomorphic.
+`poker-isomorphisms` normalises three-card poker flops and enumerates their
+suit-isomorphic representations.
 
-[GTO Wizard](https://gtowizard.com/glossary/isomorphic/)
+Two flops are suit-isomorphic when one global renaming of the four suits turns
+one flop into the other. Ranks do not change, and card order does not matter.
+For example, `Kh9s3h` and `Kd9c3d` are isomorphic under the mapping `h -> d`
+and `s -> c`.
 
-[PioSOLVER](https://piosolver.com/blog/2015-11-05-flop-subsets/)
+A 52-card deck has 22,100 distinct unordered flops. Grouping those flops by
+suit isomorphism produces 1,755 classes.
 
-## Links
+## Features
 
-Documentation: 
+- Produce one deterministic normal form for any legal flop.
+- Enumerate the complete suit-isomorphism class.
+- Accept compact notation such as `AsKhQd`.
+- Accept separated notation such as `As Kh Qd`.
+- Customise rank and suit ordering without changing poker semantics.
+- Reject malformed cards and impossible flops with clear errors.
+- Use only the Python standard library at runtime.
 
-Code: https://github.com/Thurpan/poker_isomorphisms
+## Requirements
 
-Pip: https://pypi.org/project/poker_isomorphisms/
+Use Python 3.10 or later.
 
 ## Installation
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install poker_isomorphisms.
+Install the package from the Python Package Index (PyPI):
 
-```bash
-pip install poker_isomorphisms
+```console
+python -m pip install poker-isomorphisms
 ```
 
-## Usage
+## Quick start
 
 ```python
-import poker_isomorphisms
+from poker_isomorphisms import flop_isomorphisms, flop_normalise
 
-poker_isomorphisms.flop_isomorphisms('2dAd2s')
-# returns ['As2s2h', 'As2h2s', '2sAs2h', '2s2hAs', '2hAs2s', '2h2sAs', 'As2s2d', 'As2d2s', '2sAs2d', '2s2dAs', '2dAs2s', '2d2sAs', 'As2s2c', 'As2c2s', '2sAs2c', '2s2cAs', '2cAs2s', '2c2sAs', 'Ah2h2s', 'Ah2s2h', '2hAh2s', '2h2sAh', '2sAh2h', '2s2hAh', 'Ah2h2d', 'Ah2d2h', '2hAh2d', '2h2dAh', '2dAh2h', '2d2hAh', 'Ah2h2c', 'Ah2c2h', '2hAh2c', '2h2cAh', '2cAh2h', '2c2hAh', 'Ad2d2s', 'Ad2s2d', '2dAd2s', '2d2sAd', '2sAd2d', '2s2dAd', 'Ad2d2h', 'Ad2h2d', '2dAd2h', '2d2hAd', '2hAd2d', '2h2dAd', 'Ad2d2c', 'Ad2c2d', '2dAd2c', '2d2cAd', '2cAd2d', '2c2dAd', 'Ac2c2s', 'Ac2s2c', '2cAc2s', '2c2sAc', '2sAc2c', '2s2cAc', 'Ac2c2h', 'Ac2h2c', '2cAc2h', '2c2hAc', '2hAc2c', '2h2cAc', 'Ac2c2d', 'Ac2d2c', '2cAc2d', '2c2dAc', '2dAc2c', '2d2cAc']
+normal = flop_normalise("7cQc3s")
+print(normal)
+# Qs7s3h
 
-poker_isomorphisms.flop_normalise('7cQc3s')
-# returns "Qs7s3h"
+equivalent_flops = flop_isomorphisms("Ac 8d 3d")
+print(equivalent_flops[:3])
+# ['As 8h 3h', 'As 3h 8h', '8h As 3h']
 ```
 
-## Contributing
+The American spelling `flop_normalize` is an alias of `flop_normalise`.
 
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+## Card notation
 
-## License
+Each card has a one-character rank followed by a one-character suit.
 
-[MIT](https://choosealicense.com/licenses/mit/)
+- Ranks: `A`, `K`, `Q`, `J`, `T`, `9`, `8`, `7`, `6`, `5`, `4`, `3`, `2`
+- Suits: `s`, `h`, `d`, `c`
 
-## Authors
+Notation is case-sensitive. A flop must contain exactly three distinct cards.
+Use either compact notation or separate all three cards with whitespace. Spaces
+and tabs are both accepted as separators.
 
-* Euan McNicholas [GitHub](https://github.com/Thurpan)
+Valid inputs include:
+
+```text
+AsKhQd
+As Kh Qd
+```
+
+Invalid inputs include duplicate cards, partial separators, unknown ranks,
+unknown suits, or text after the third card.
+
+## API
+
+### `flop_normalise`
+
+```python
+flop_normalise(
+    flop,
+    with_spaces=None,
+    suits_order="shdc",
+    rank_order="AKQJT98765432",
+)
+```
+
+Return the deterministic representative of the flop's isomorphism class. The
+default rank order is descending. The default suit preference is spades,
+hearts, diamonds, then clubs.
+
+When `with_spaces` is `None`, the result preserves whether the input used
+separators. Set it to `True` or `False` to select the output format explicitly.
+
+```python
+flop_normalise("Ac 8d 3d")
+# 'As 8h 3h'
+
+flop_normalise("Ac 8d 3d", with_spaces=False)
+# 'As8h3h'
+```
+
+### `flop_isomorphisms`
+
+```python
+flop_isomorphisms(
+    flop,
+    with_spaces=None,
+    suits_order="shdc",
+    rank_order="AKQJT98765432",
+)
+```
+
+Return every distinct string obtained through a global suit permutation and a
+permutation of the three card positions. The function returns a deterministic
+list and removes duplicates caused by board symmetry.
+
+The result contains 24, 72, or 144 strings, depending on the flop's rank and
+suit symmetries. These totals include card-order permutations. The physical
+flop itself remains unordered.
+
+### Custom ordering
+
+Pass each standard rank or suit exactly once. A custom order affects the normal
+form and result ordering. It does not change which flops are isomorphic.
+
+```python
+flop_normalise("7cQc3s", suits_order="cdhs")
+# 'Qc7c3d'
+
+flop_normalise("7cQc3s", rank_order="23456789TJQKA")
+# '3s7hQh'
+```
+
+## How normalisation works
+
+The normaliser applies every bijection of the four suits. It sorts the cards
+under the requested rank and suit order for each bijection. It then selects the
+first candidate under that same ordering.
+
+This definition handles monotone, two-tone, rainbow, paired, and three-of-a-kind
+flops without separate special cases.
+
+## Scope
+
+The package handles three-card community flops only. It does not compare hole
+cards, turn cards, river cards, betting ranges, or game trees.
+
+For broader background, see the explanations from
+[GTO Wizard](https://gtowizard.com/glossary/isomorphic/) and
+[PioSOLVER](https://piosolver.com/blog/2015-11-05-flop-subsets/).
+
+## Development
+
+Install the repository in editable mode:
+
+```console
+python -m pip install -e .
+```
+
+Run the test suite:
+
+```console
+python -m unittest discover -s tests -v
+```
+
+Build a wheel in the ignored `dist` directory:
+
+```console
+python -m pip wheel --no-deps --wheel-dir dist .
+```
+
+The tests compare representative flops with an independent suit-permutation
+implementation. They also verify that all 22,100 legal flops produce exactly
+1,755 normal forms.
+
+## Licence
+
+This project uses the [MIT Licence](LICENSE).
+
+## Author
+
+Euan McNicholas ([Thurpan on GitHub](https://github.com/Thurpan))

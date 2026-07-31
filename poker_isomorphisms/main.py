@@ -1,136 +1,208 @@
+"""Utilities for identifying suit-isomorphic poker flops."""
+
+from collections.abc import Sequence
 from itertools import permutations
 
-def flop_isomorphisms(flop, 
-                     with_spaces=None, 
-                     suits_order=['s', 'h', 'd', 'c'], 
-                     rank_order=['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']):
+_RANKS = tuple("AKQJT98765432")
+_SUITS = tuple("shdc")
 
-    cards = [r+s for r in rank_order for s in suits_order]
-    suits_s = ['h', 'd', 'c']
-    suits_h = ['s', 'd', 'c']
-    suits_d = ['s', 'h', 'c']
-    suits_c = ['s', 'h', 'd']
-    suits_sh = ['d', 'c']
-    suits_sd = ['h', 'c']
-    suits_sc = ['h', 'd']
-    suits_hs = ['d', 'c']
-    suits_hd = ['s', 'c']
-    suits_hc = ['s', 'd']
-    suits_ds = ['h', 'c']
-    suits_dh = ['s', 'c']
-    suits_dc = ['s', 'h']
-    suits_cs = ['h', 'd']
-    suits_ch = ['s', 'd']
-    suits_cd = ['s', 'h']
 
-    if with_spaces == True:
-        spaces = ' '
-    elif with_spaces == False:
-        spaces = ''
-    elif with_spaces == None:
-        if flop.count(' ') > 1:
-            spaces = ' '
-        else:
-            spaces = ''
+def _validate_order(
+    order: Sequence[str], expected_values: tuple[str, ...], name: str
+) -> tuple[str, ...]:
+    """Return a validated rank or suit order."""
+    if not isinstance(order, Sequence):
+        raise TypeError(f"{name} must be a sequence")
 
-    flop = flop.replace(' ','')
-    sorted_cards = [flop[0:2], flop[2:4], flop[4:6]]
-    sorted_cards.sort(key=lambda x:cards.index(x))
-    r1, r2, r3 = sorted_cards[0][0], sorted_cards[1][0], sorted_cards[2][0]
-    s1, s2, s3 = sorted_cards[0][1], sorted_cards[1][1], sorted_cards[2][1]
+    values = tuple(order)
+    contains_single_characters = all(
+        isinstance(value, str) and len(value) == 1 for value in values
+    )
+    if (
+        len(values) != len(expected_values)
+        or not contains_single_characters
+        or set(values) != set(expected_values)
+    ):
+        required_values = "".join(expected_values)
+        raise ValueError(
+            f"{name} must contain each character in {required_values!r} exactly once"
+        )
 
-    if s1 == s2 == s3: #mono
-        flops = [f'{r1}{suit}{r2}{suit}{r3}{suit}' for suit in suits_order]
-    elif s1 == s2 or s1 == s3 or s2 == s3: #suited
-        if r1 == r2 and s1 != s3:
-            temp = s1
-            s1 = s2
-            s2 = temp
-        if r2 == r3 and s1 != s2:
-            temp = s2
-            s2 = s3
-            s3 = temp
-        if s1 == s2:
-            flops_s = [f'{r1}s{r2}s{r3}{suit}' for suit in suits_s]
-            flops_h = [f'{r1}h{r2}h{r3}{suit}' for suit in suits_h]
-            flops_d = [f'{r1}d{r2}d{r3}{suit}' for suit in suits_d]
-            flops_c = [f'{r1}c{r2}c{r3}{suit}' for suit in suits_c]
-        elif s1 == s3:
-            flops_s = [f'{r1}s{r2}{suit}{r3}s' for suit in suits_s]
-            flops_h = [f'{r1}h{r2}{suit}{r3}h' for suit in suits_h]
-            flops_d = [f'{r1}d{r2}{suit}{r3}d' for suit in suits_d]
-            flops_c = [f'{r1}c{r2}{suit}{r3}c' for suit in suits_c]
-        elif s2 == s3:
-            flops_s = [f'{r1}s{r2}{suit}{r3}{suit}' for suit in suits_s]
-            flops_h = [f'{r1}h{r2}{suit}{r3}{suit}' for suit in suits_h]
-            flops_d = [f'{r1}d{r2}{suit}{r3}{suit}' for suit in suits_d]
-            flops_c = [f'{r1}c{r2}{suit}{r3}{suit}' for suit in suits_c]
-        flops = flops_s + flops_h + flops_d + flops_c
-    else: #rainbow
-        flops_sh = [f'{r1}s{r2}h{r3}{suit}' for suit in suits_sh]
-        flops_sd = [f'{r1}s{r2}d{r3}{suit}' for suit in suits_sd]
-        flops_sc = [f'{r1}s{r2}c{r3}{suit}' for suit in suits_sc]
-        flops_hs = [f'{r1}h{r2}s{r3}{suit}' for suit in suits_hs]
-        flops_hd = [f'{r1}h{r2}d{r3}{suit}' for suit in suits_hd]
-        flops_hc = [f'{r1}h{r2}c{r3}{suit}' for suit in suits_hc]
-        flops_ds = [f'{r1}d{r2}s{r3}{suit}' for suit in suits_ds]
-        flops_dh = [f'{r1}d{r2}h{r3}{suit}' for suit in suits_dh]
-        flops_dc = [f'{r1}d{r2}c{r3}{suit}' for suit in suits_dc]
-        flops_cs = [f'{r1}c{r2}s{r3}{suit}' for suit in suits_cs]
-        flops_ch = [f'{r1}c{r2}h{r3}{suit}' for suit in suits_ch]
-        flops_cd = [f'{r1}c{r2}d{r3}{suit}' for suit in suits_cd]
-        flops = flops_sh + flops_sd + flops_sc + flops_hs + flops_hd + flops_hc + flops_ds + flops_dh + flops_dc + flops_cs + flops_ch + flops_cd
+    return values
 
-    flop_list = []
-    for flop in flops:
-        for card_list in list(permutations([flop[0:2], flop[2:4], flop[4:6]])):
-            flop_list.append(f'{card_list[0]}{spaces}{card_list[1]}{spaces}{card_list[2]}')
-    return list(dict.fromkeys(flop_list))
 
-def flop_normalise(flop, 
-                   with_spaces=None, 
-                   suits_order=['s', 'h', 'd', 'c'], 
-                   rank_order=['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']):
+def _parse_flop(
+    flop: str, rank_order: tuple[str, ...], suits_order: tuple[str, ...]
+) -> tuple[tuple[str, str, str], bool]:
+    """Parse and validate a compact or whitespace-separated flop."""
+    if not isinstance(flop, str):
+        raise TypeError("flop must be a string")
 
-    if with_spaces == True:
-        spaces = ' '
-    elif with_spaces == False:
-        spaces = ''
-    elif with_spaces == None:
-        if flop.count(' ') > 1:
-            spaces = ' '
-        else:
-            spaces = ''
+    tokens = flop.split()
+    if len(tokens) == 1 and len(tokens[0]) == 6:
+        compact_flop = tokens[0]
+        input_has_spaces = False
+    elif len(tokens) == 3 and all(len(token) == 2 for token in tokens):
+        compact_flop = "".join(tokens)
+        input_has_spaces = True
+    else:
+        raise ValueError(
+            "flop must contain exactly three cards in 'AsKhQd' or "
+            "'As Kh Qd' format"
+        )
 
-    cards = [r+s for r in rank_order for s in suits_order]
-    flop = flop.replace(' ','')
-    sorted_cards = [flop[0:2], flop[2:4], flop[4:6]]
-    sorted_cards.sort(key=lambda x:cards.index(x))
-    r1, r2, r3 = sorted_cards[0][0], sorted_cards[1][0], sorted_cards[2][0]
-    s1, s2, s3 = sorted_cards[0][1], sorted_cards[1][1], sorted_cards[2][1]
+    cards = (
+        compact_flop[0:2],
+        compact_flop[2:4],
+        compact_flop[4:6],
+    )
+    valid_ranks = set(rank_order)
+    valid_suits = set(suits_order)
+    invalid_card = next(
+        (
+            card
+            for card in cards
+            if card[0] not in valid_ranks or card[1] not in valid_suits
+        ),
+        None,
+    )
+    if invalid_card is not None:
+        raise ValueError(
+            f"flop contains invalid card {invalid_card!r}; use ranks "
+            f"{''.join(_RANKS)!r} and suits {''.join(_SUITS)!r}"
+        )
 
-    if s1 == s2 == s3: #mono
-        suit = suits_order[0]
-        return f'{r1}{suit}{spaces}{r2}{suit}{spaces}{r3}{suit}'
-    elif s1 == s2 or s1 == s3 or s2 == s3: #suited
-        if r1 == r2 and s1 != s3:
-            temp = s1
-            s1 = s2
-            s2 = temp
-        if r2 == r3 and s1 != s2:
-            temp = s2
-            s2 = s3
-            s3 = temp
-        suit_0 = suits_order[0]
-        suit_1 = suits_order[1]
-        if s1 == s2:
-            return f'{r1}{suit_0}{spaces}{r2}{suit_0}{spaces}{r3}{suit_1}'
-        elif s1 == s3:
-            return f'{r1}{suit_0}{spaces}{r2}{suit_1}{spaces}{r3}{suit_0}'
-        elif s2 == s3:
-            return f'{r1}{suit_0}{spaces}{r2}{suit_1}{spaces}{r3}{suit_1}'
-    else: #rainbow
-        suit_0 = suits_order[0]
-        suit_1 = suits_order[1]
-        suit_2 = suits_order[2]
-        return f'{r1}{suit_0}{spaces}{r2}{suit_1}{spaces}{r3}{suit_2}'
+    if len(set(cards)) != 3:
+        raise ValueError("flop must contain three distinct cards")
+
+    return cards, input_has_spaces
+
+
+def _get_separator(with_spaces: bool | None, input_has_spaces: bool) -> str:
+    """Select the requested output separator."""
+    if with_spaces is None:
+        return " " if input_has_spaces else ""
+    if type(with_spaces) is not bool:
+        raise TypeError("with_spaces must be True, False, or None")
+    return " " if with_spaces else ""
+
+
+def _normalise_cards(
+    cards: tuple[str, str, str],
+    rank_order: tuple[str, ...],
+    suits_order: tuple[str, ...],
+) -> tuple[str, str, str]:
+    """Find the first sorted representative across all suit renamings."""
+    card_positions = {
+        rank + suit: position
+        for position, (rank, suit) in enumerate(
+            (rank, suit) for rank in rank_order for suit in suits_order
+        )
+    }
+
+    candidates = []
+    for renamed_suits in permutations(suits_order):
+        suit_mapping = dict(zip(suits_order, renamed_suits))
+        renamed_cards = tuple(
+            sorted(
+                (card[0] + suit_mapping[card[1]] for card in cards),
+                key=card_positions.__getitem__,
+            )
+        )
+        candidates.append(renamed_cards)
+
+    return min(
+        candidates,
+        key=lambda candidate: tuple(card_positions[card] for card in candidate),
+    )
+
+
+def flop_isomorphisms(
+    flop: str,
+    with_spaces: bool | None = None,
+    suits_order: Sequence[str] = _SUITS,
+    rank_order: Sequence[str] = _RANKS,
+) -> list[str]:
+    """Return every ordered representation in a flop's suit-isomorphism class.
+
+    A result can differ from the input by a global permutation of the four suits
+    and by the order of its three cards. Duplicate strings are removed.
+
+    Args:
+        flop: Three distinct cards in compact or whitespace-separated notation.
+        with_spaces: Add spaces, remove spaces, or preserve the input style with
+            ``None``.
+        suits_order: A permutation of ``shdc`` used to order results.
+        rank_order: A permutation of ``AKQJT98765432`` used to order results.
+
+    Returns:
+        The isomorphic flop strings in deterministic order.
+
+    Raises:
+        TypeError: An argument has the wrong type.
+        ValueError: The flop or an ordering argument is invalid.
+    """
+    validated_suits = _validate_order(suits_order, _SUITS, "suits_order")
+    validated_ranks = _validate_order(rank_order, _RANKS, "rank_order")
+    cards, input_has_spaces = _parse_flop(
+        flop, validated_ranks, validated_suits
+    )
+    separator = _get_separator(with_spaces, input_has_spaces)
+    normalised_cards = _normalise_cards(
+        cards, validated_ranks, validated_suits
+    )
+    used_suits = tuple(dict.fromkeys(card[1] for card in normalised_cards))
+
+    results = []
+    seen_results = set()
+    for target_suits in permutations(validated_suits, len(used_suits)):
+        suit_mapping = dict(zip(used_suits, target_suits))
+        renamed_cards = tuple(
+            card[0] + suit_mapping[card[1]] for card in normalised_cards
+        )
+        for ordered_cards in permutations(renamed_cards):
+            result = separator.join(ordered_cards)
+            if result not in seen_results:
+                results.append(result)
+                seen_results.add(result)
+
+    return results
+
+
+def flop_normalise(
+    flop: str,
+    with_spaces: bool | None = None,
+    suits_order: Sequence[str] = _SUITS,
+    rank_order: Sequence[str] = _RANKS,
+) -> str:
+    """Return the canonical representative of a flop's isomorphism class.
+
+    Args:
+        flop: Three distinct cards in compact or whitespace-separated notation.
+        with_spaces: Add spaces, remove spaces, or preserve the input style with
+            ``None``.
+        suits_order: A permutation of ``shdc`` used for canonical ordering.
+        rank_order: A permutation of ``AKQJT98765432`` used for card ordering.
+
+    Returns:
+        The canonical flop string.
+
+    Raises:
+        TypeError: An argument has the wrong type.
+        ValueError: The flop or an ordering argument is invalid.
+    """
+    validated_suits = _validate_order(suits_order, _SUITS, "suits_order")
+    validated_ranks = _validate_order(rank_order, _RANKS, "rank_order")
+    cards, input_has_spaces = _parse_flop(
+        flop, validated_ranks, validated_suits
+    )
+    separator = _get_separator(with_spaces, input_has_spaces)
+    normalised_cards = _normalise_cards(
+        cards, validated_ranks, validated_suits
+    )
+    return separator.join(normalised_cards)
+
+
+flop_normalize = flop_normalise
+
+__all__ = ["flop_isomorphisms", "flop_normalise", "flop_normalize"]

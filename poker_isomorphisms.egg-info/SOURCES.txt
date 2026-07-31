@@ -1,8 +1,0 @@
-README.md
-setup.py
-poker_isomorphisms/__init__.py
-poker_isomorphisms/main.py
-poker_isomorphisms.egg-info/PKG-INFO
-poker_isomorphisms.egg-info/SOURCES.txt
-poker_isomorphisms.egg-info/dependency_links.txt
-poker_isomorphisms.egg-info/top_level.txt

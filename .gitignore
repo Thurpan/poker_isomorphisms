@@ -1,2 +1,9 @@
-test.py
-upload_reminder.txt
+__pycache__/
+*.egg-info/
+*.py[cod]
+.coverage
+.pytest_cache/
+.venv/
+build/
+dist/
+htmlcov/
