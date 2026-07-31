@@ -4,7 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "poker-isomorphisms"
-version = "0.6.0"
 description = "Normalise poker flops and enumerate suit-isomorphic representations."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,18 +14,26 @@ authors = [
 ]
 keywords = ["poker", "flop", "isomorphism", "cards"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Topic :: Games/Entertainment :: Board Games",
 ]
 dependencies = []
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/Thurpan/poker_isomorphisms"
 Repository = "https://github.com/Thurpan/poker_isomorphisms"
 Issues = "https://github.com/Thurpan/poker_isomorphisms/issues"
+Changelog = "https://github.com/Thurpan/poker_isomorphisms/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 include = ["poker_isomorphisms*"]
 namespaces = false
+
+[tool.setuptools.dynamic]
+version = { attr = "poker_isomorphisms.__version__" }
+
+[tool.setuptools.package-data]
+poker_isomorphisms = ["py.typed"]

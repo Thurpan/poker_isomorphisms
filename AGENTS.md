@@ -13,6 +13,8 @@ It also enumerates every equivalent card-string representation.
 - Card order does not affect a flop's normal form.
 - Default valid-input results must remain deterministic.
 - The 22,100 legal flops must produce exactly 1,755 normal forms.
+- The physical isomorphism class contains 4, 12, or 24 unordered boards.
+- The package has no runtime dependencies.
 
 ## Validation
 
@@ -22,13 +24,27 @@ Run the complete test suite after a source change:
 python -m unittest discover -s tests -v
 ```
 
-Build the package after a packaging or metadata change:
+Install release-validation tools before packaging work:
 
 ```console
-python -m pip wheel --no-deps --wheel-dir dist .
+python -m pip install build twine
+```
+
+Build and validate both distribution formats:
+
+```console
+python -m build
+python -m twine check dist/*
+```
+
+Validate Markdown after a documentation change:
+
+```console
+npx --yes markdownlint-cli2 README.md AGENTS.md CHANGELOG.md
 ```
 
 ## Generated artefacts
 
 Do not commit `build`, `dist`, `*.egg-info`, `__pycache__`, or coverage output.
 Generate release artefacts from a clean source checkout.
+Do not publish to PyPI from automated validation or without explicit approval.

@@ -1,7 +1,8 @@
 """Utilities for identifying suit-isomorphic poker flops."""
 
-from collections.abc import Sequence
-from itertools import permutations
+from collections.abc import Iterable, Iterator, Sequence
+from functools import lru_cache
+from itertools import combinations, permutations
 
 _RANKS = tuple("AKQJT98765432")
 _SUITS = tuple("shdc")
@@ -80,11 +81,29 @@ def _parse_flop(
 
 def _get_separator(with_spaces: bool | None, input_has_spaces: bool) -> str:
     """Select the requested output separator."""
+    _validate_with_spaces(with_spaces)
     if with_spaces is None:
         return " " if input_has_spaces else ""
-    if type(with_spaces) is not bool:
-        raise TypeError("with_spaces must be True, False, or None")
     return " " if with_spaces else ""
+
+
+def _validate_with_spaces(with_spaces: bool | None) -> None:
+    """Validate the shared output-format option."""
+    if with_spaces is not None and type(with_spaces) is not bool:
+        raise TypeError("with_spaces must be True, False, or None")
+
+
+@lru_cache(maxsize=16)
+def _card_positions(
+    rank_order: tuple[str, ...], suits_order: tuple[str, ...]
+) -> dict[str, int]:
+    """Return card positions for a validated rank and suit order."""
+    return {
+        rank + suit: position
+        for position, (rank, suit) in enumerate(
+            (rank, suit) for rank in rank_order for suit in suits_order
+        )
+    }
 
 
 def _normalise_cards(
@@ -93,12 +112,7 @@ def _normalise_cards(
     suits_order: tuple[str, ...],
 ) -> tuple[str, str, str]:
     """Find the first sorted representative across all suit renamings."""
-    card_positions = {
-        rank + suit: position
-        for position, (rank, suit) in enumerate(
-            (rank, suit) for rank in rank_order for suit in suits_order
-        )
-    }
+    card_positions = _card_positions(rank_order, suits_order)
 
     candidates = []
     for renamed_suits in permutations(suits_order):
@@ -115,6 +129,33 @@ def _normalise_cards(
         candidates,
         key=lambda candidate: tuple(card_positions[card] for card in candidate),
     )
+
+
+def _normalise_validated_flop(
+    flop: str,
+    with_spaces: bool | None,
+    rank_order: tuple[str, ...],
+    suits_order: tuple[str, ...],
+) -> str:
+    """Normalise one flop after validating the ordering arguments."""
+    cards, input_has_spaces = _parse_flop(flop, rank_order, suits_order)
+    separator = _get_separator(with_spaces, input_has_spaces)
+    normalised_cards = _normalise_cards(cards, rank_order, suits_order)
+    return separator.join(normalised_cards)
+
+
+def _renamed_card_sets(
+    normalised_cards: tuple[str, str, str], suits_order: tuple[str, ...]
+) -> Iterator[tuple[str, str, str]]:
+    """Yield suit-renamed card tuples in the legacy deterministic order."""
+    used_suits = tuple(dict.fromkeys(card[1] for card in normalised_cards))
+    for target_suits in permutations(suits_order, len(used_suits)):
+        suit_mapping = dict(zip(used_suits, target_suits))
+        yield (
+            normalised_cards[0][0] + suit_mapping[normalised_cards[0][1]],
+            normalised_cards[1][0] + suit_mapping[normalised_cards[1][1]],
+            normalised_cards[2][0] + suit_mapping[normalised_cards[2][1]],
+        )
 
 
 def flop_isomorphisms(
@@ -151,15 +192,10 @@ def flop_isomorphisms(
     normalised_cards = _normalise_cards(
         cards, validated_ranks, validated_suits
     )
-    used_suits = tuple(dict.fromkeys(card[1] for card in normalised_cards))
 
     results = []
     seen_results = set()
-    for target_suits in permutations(validated_suits, len(used_suits)):
-        suit_mapping = dict(zip(used_suits, target_suits))
-        renamed_cards = tuple(
-            card[0] + suit_mapping[card[1]] for card in normalised_cards
-        )
+    for renamed_cards in _renamed_card_sets(normalised_cards, validated_suits):
         for ordered_cards in permutations(renamed_cards):
             result = separator.join(ordered_cards)
             if result not in seen_results:
@@ -193,6 +229,39 @@ def flop_normalise(
     """
     validated_suits = _validate_order(suits_order, _SUITS, "suits_order")
     validated_ranks = _validate_order(rank_order, _RANKS, "rank_order")
+    return _normalise_validated_flop(
+        flop, with_spaces, validated_ranks, validated_suits
+    )
+
+
+def flop_isomorphism_class(
+    flop: str,
+    with_spaces: bool | None = None,
+    suits_order: Sequence[str] = _SUITS,
+    rank_order: Sequence[str] = _RANKS,
+) -> list[str]:
+    """Return each unique physical flop in a suit-isomorphism class.
+
+    Unlike :func:`flop_isomorphisms`, this function returns each unordered
+    three-card board once. Cards within each result use the requested canonical
+    rank and suit order.
+
+    Args:
+        flop: Three distinct cards in compact or whitespace-separated notation.
+        with_spaces: Add spaces, remove spaces, or preserve the input style with
+            ``None``.
+        suits_order: A permutation of ``shdc`` used to order results.
+        rank_order: A permutation of ``AKQJT98765432`` used to order results.
+
+    Returns:
+        The unique physical flops in deterministic order.
+
+    Raises:
+        TypeError: An argument has the wrong type.
+        ValueError: The flop or an ordering argument is invalid.
+    """
+    validated_suits = _validate_order(suits_order, _SUITS, "suits_order")
+    validated_ranks = _validate_order(rank_order, _RANKS, "rank_order")
     cards, input_has_spaces = _parse_flop(
         flop, validated_ranks, validated_suits
     )
@@ -200,9 +269,175 @@ def flop_normalise(
     normalised_cards = _normalise_cards(
         cards, validated_ranks, validated_suits
     )
-    return separator.join(normalised_cards)
+    card_positions = _card_positions(validated_ranks, validated_suits)
+
+    results = []
+    seen_results = set()
+    for renamed_cards in _renamed_card_sets(normalised_cards, validated_suits):
+        ordered_cards = tuple(
+            sorted(renamed_cards, key=card_positions.__getitem__)
+        )
+        result = separator.join(ordered_cards)
+        if result not in seen_results:
+            results.append(result)
+            seen_results.add(result)
+
+    return results
+
+
+def flops_are_isomorphic(
+    flop_a: str,
+    flop_b: str,
+    *,
+    suits_order: Sequence[str] = _SUITS,
+    rank_order: Sequence[str] = _RANKS,
+) -> bool:
+    """Return whether two flops differ only by suit and card permutations.
+
+    Args:
+        flop_a: The first flop to compare.
+        flop_b: The second flop to compare.
+        suits_order: A permutation of ``shdc`` used for normalisation.
+        rank_order: A permutation of ``AKQJT98765432`` used for normalisation.
+
+    Returns:
+        ``True`` when both flops have the same canonical representative.
+
+    Raises:
+        TypeError: An argument has the wrong type.
+        ValueError: A flop or an ordering argument is invalid.
+    """
+    validated_suits = _validate_order(suits_order, _SUITS, "suits_order")
+    validated_ranks = _validate_order(rank_order, _RANKS, "rank_order")
+
+    normal_forms = []
+    for name, flop in (("flop_a", flop_a), ("flop_b", flop_b)):
+        try:
+            cards, _ = _parse_flop(flop, validated_ranks, validated_suits)
+        except (TypeError, ValueError) as error:
+            raise type(error)(f"{name}: {error}") from error
+        normal_forms.append(
+            _normalise_cards(cards, validated_ranks, validated_suits)
+        )
+
+    return normal_forms[0] == normal_forms[1]
+
+
+def normalise_flops(
+    flops: Iterable[str],
+    *,
+    with_spaces: bool | None = False,
+    suits_order: Sequence[str] = _SUITS,
+    rank_order: Sequence[str] = _RANKS,
+) -> list[str]:
+    """Normalise a sequence of flops while preserving its order and duplicates.
+
+    Invalid items raise the same error as :func:`flop_normalise`, prefixed with
+    their zero-based position in ``flops``.
+
+    Args:
+        flops: A non-string iterable of flop strings.
+        with_spaces: Use spaces, omit spaces, or preserve each input style with
+            ``None``.
+        suits_order: A permutation of ``shdc`` used for normalisation.
+        rank_order: A permutation of ``AKQJT98765432`` used for normalisation.
+
+    Returns:
+        One normal form for every input, in input order.
+
+    Raises:
+        TypeError: An argument or flop has the wrong type.
+        ValueError: A flop or an ordering argument is invalid.
+    """
+    if isinstance(flops, (str, bytes)):
+        raise TypeError("flops must be a non-string iterable")
+    try:
+        iterator = iter(flops)
+    except TypeError as error:
+        raise TypeError("flops must be a non-string iterable") from error
+
+    validated_suits = _validate_order(suits_order, _SUITS, "suits_order")
+    validated_ranks = _validate_order(rank_order, _RANKS, "rank_order")
+    _validate_with_spaces(with_spaces)
+
+    results = []
+    for index, flop in enumerate(iterator):
+        try:
+            result = _normalise_validated_flop(
+                flop, with_spaces, validated_ranks, validated_suits
+            )
+        except (TypeError, ValueError) as error:
+            raise type(error)(f"flops[{index}]: {error}") from error
+        results.append(result)
+
+    return results
+
+
+@lru_cache(maxsize=16)
+def _all_flop_normal_forms(
+    rank_order: tuple[str, ...], suits_order: tuple[str, ...]
+) -> tuple[str, ...]:
+    """Build and cache the complete unspaced normal-form catalogue."""
+    deck = tuple(rank + suit for rank in rank_order for suit in suits_order)
+    normal_forms = {
+        "".join(_normalise_cards(cards, rank_order, suits_order))
+        for cards in combinations(deck, 3)
+    }
+    card_positions = _card_positions(rank_order, suits_order)
+    return tuple(
+        sorted(
+            normal_forms,
+            key=lambda flop: tuple(
+                card_positions[flop[index : index + 2]]
+                for index in range(0, 6, 2)
+            ),
+        )
+    )
+
+
+def all_flop_normal_forms(
+    *,
+    with_spaces: bool = False,
+    suits_order: Sequence[str] = _SUITS,
+    rank_order: Sequence[str] = _RANKS,
+) -> list[str]:
+    """Return all 1,755 canonical flop representatives.
+
+    A fresh list is returned on every call. Internal unspaced catalogues are
+    cached for reuse.
+
+    Args:
+        with_spaces: Add one space between cards when ``True``.
+        suits_order: A permutation of ``shdc`` used for canonical ordering.
+        rank_order: A permutation of ``AKQJT98765432`` used for card ordering.
+
+    Returns:
+        The complete normal-form catalogue in deterministic order.
+
+    Raises:
+        TypeError: An argument has the wrong type.
+        ValueError: An ordering argument is invalid.
+    """
+    if type(with_spaces) is not bool:
+        raise TypeError("with_spaces must be True or False")
+    validated_suits = _validate_order(suits_order, _SUITS, "suits_order")
+    validated_ranks = _validate_order(rank_order, _RANKS, "rank_order")
+    normal_forms = _all_flop_normal_forms(validated_ranks, validated_suits)
+    if not with_spaces:
+        return list(normal_forms)
+    return [" ".join((flop[0:2], flop[2:4], flop[4:6])) for flop in normal_forms]
 
 
 flop_normalize = flop_normalise
+normalize_flops = normalise_flops
 
-__all__ = ["flop_isomorphisms", "flop_normalise", "flop_normalize"]
+__all__ = [
+    "all_flop_normal_forms",
+    "flop_isomorphism_class",
+    "flop_isomorphisms",
+    "flop_normalise",
+    "flop_normalize",
+    "flops_are_isomorphic",
+    "normalise_flops",
+    "normalize_flops",
+]

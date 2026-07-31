@@ -14,7 +14,9 @@ suit isomorphism produces 1,755 classes.
 ## Features
 
 - Produce one deterministic normal form for any legal flop.
-- Enumerate the complete suit-isomorphism class.
+- Enumerate unique physical flops or every ordered string representation.
+- Compare two flops directly for suit isomorphism.
+- Normalise batches and list all 1,755 canonical flops.
 - Accept compact notation such as `AsKhQd`.
 - Accept separated notation such as `As Kh Qd`.
 - Customise rank and suit ordering without changing poker semantics.
@@ -36,18 +38,25 @@ python -m pip install poker-isomorphisms
 ## Quick start
 
 ```python
-from poker_isomorphisms import flop_isomorphisms, flop_normalise
+from poker_isomorphisms import (
+    flop_isomorphism_class,
+    flop_normalise,
+    flops_are_isomorphic,
+)
 
 normal = flop_normalise("7cQc3s")
 print(normal)
 # Qs7s3h
 
-equivalent_flops = flop_isomorphisms("Ac 8d 3d")
-print(equivalent_flops[:3])
-# ['As 8h 3h', 'As 3h 8h', '8h As 3h']
+physical_flops = flop_isomorphism_class("Ac 8d 3d")
+print(len(physical_flops))
+# 12
+
+print(flops_are_isomorphic("Kh9s3h", "Kd9c3d"))
+# True
 ```
 
-The American spelling `flop_normalize` is an alias of `flop_normalise`.
+The package exposes its installed version as `poker_isomorphisms.__version__`.
 
 ## Card notation
 
@@ -117,6 +126,92 @@ The result contains 24, 72, or 144 strings, depending on the flop's rank and
 suit symmetries. These totals include card-order permutations. The physical
 flop itself remains unordered.
 
+This function retains its original ordered-string behaviour for compatibility.
+Use `flop_isomorphism_class` when card-order permutations are not required.
+
+### `flop_isomorphism_class`
+
+```python
+flop_isomorphism_class(
+    flop,
+    with_spaces=None,
+    suits_order="shdc",
+    rank_order="AKQJT98765432",
+)
+```
+
+Return each unique physical flop in the isomorphism class once. Cards in each
+result use canonical rank and suit order. The result contains 4, 12, or 24
+boards, depending on the flop's symmetries.
+
+```python
+flop_isomorphism_class("AsKhQd")[:3]
+# ['AsKhQd', 'AsKhQc', 'AsKdQh']
+```
+
+### `flops_are_isomorphic`
+
+```python
+flops_are_isomorphic(
+    flop_a,
+    flop_b,
+    *,
+    suits_order="shdc",
+    rank_order="AKQJT98765432",
+)
+```
+
+Return `True` when the two flops differ only by a global suit permutation and
+card ordering. Input spacing does not affect the comparison. Invalid inputs
+raise the same clear errors as the normalisation functions, prefixed with
+`flop_a` or `flop_b`.
+
+### `normalise_flops`
+
+```python
+normalise_flops(
+    flops,
+    *,
+    with_spaces=False,
+    suits_order="shdc",
+    rank_order="AKQJT98765432",
+)
+```
+
+Normalise any non-string iterable of flops. The result preserves input order
+and duplicates. Compact output is the default so mixed input styles produce a
+uniform result. Pass `with_spaces=None` to preserve each input's style.
+
+The function stops at the first invalid item. Its error starts with the item's
+zero-based position, such as `flops[2]`. The American spelling
+`normalize_flops` is an alias.
+
+```python
+normalise_flops(["7cQc3s", "Ac 8d 3d", "7cQc3s"])
+# ['Qs7s3h', 'As8h3h', 'Qs7s3h']
+```
+
+### `all_flop_normal_forms`
+
+```python
+all_flop_normal_forms(
+    *,
+    with_spaces=False,
+    suits_order="shdc",
+    rank_order="AKQJT98765432",
+)
+```
+
+Return all 1,755 canonical representatives in deterministic order. Every call
+returns a fresh list. The package caches internal immutable catalogues for
+reuse.
+
+```python
+normal_forms = all_flop_normal_forms()
+len(normal_forms)
+# 1755
+```
+
 ### Custom ordering
 
 Pass each standard rank or suit exactly once. A custom order affects the normal
@@ -144,6 +239,16 @@ flops without separate special cases.
 The package handles three-card community flops only. It does not compare hole
 cards, turn cards, river cards, betting ranges, or game trees.
 
+## Compatibility
+
+Version 1 establishes the documented public API. Compatible 1.x releases can
+add functionality, but they will preserve existing public signatures, default
+behaviour, and valid-input result ordering. A necessary breaking change will
+require a new major version.
+
+The American spelling `flop_normalize` remains an alias of `flop_normalise`.
+See the [changelog](CHANGELOG.md) for release details.
+
 For broader background, see the explanations from
 [GTO Wizard](https://gtowizard.com/glossary/isomorphic/) and
 [PioSOLVER](https://piosolver.com/blog/2015-11-05-flop-subsets/).
@@ -162,15 +267,23 @@ Run the test suite:
 python -m unittest discover -s tests -v
 ```
 
-Build a wheel in the ignored `dist` directory:
+Install the release-validation tools:
 
 ```console
-python -m pip wheel --no-deps --wheel-dir dist .
+python -m pip install build twine
+```
+
+Build and validate the wheel and source distribution:
+
+```console
+python -m build
+python -m twine check dist/*
 ```
 
 The tests compare representative flops with an independent suit-permutation
 implementation. They also verify that all 22,100 legal flops produce exactly
-1,755 normal forms.
+1,755 normal forms. GitHub Actions runs these tests on Python 3.10 through 3.14
+and validates the release artefacts. It does not publish to PyPI.
 
 ## Licence
 
