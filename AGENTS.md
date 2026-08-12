@@ -47,4 +47,6 @@ npx --yes markdownlint-cli2 README.md AGENTS.md CHANGELOG.md
 
 Do not commit `build`, `dist`, `*.egg-info`, `__pycache__`, or coverage output.
 Generate release artefacts from a clean source checkout.
+Publish only the `python-distributions` artefact from the successful CI run for
+the release commit. Do not rebuild validated distributions before publication.
 Do not publish to PyPI from automated validation or without explicit approval.
