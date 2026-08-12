@@ -39,8 +39,9 @@ jobs:
       - name: Install package
         run: python -m pip install .
 
-      - name: Run tests
-        run: python -m unittest discover -s tests -v
+      - name: Run tests against installed package
+        working-directory: ${{ runner.temp }}
+        run: python -m unittest discover -s "$GITHUB_WORKSPACE/tests" -v
 
   release-validation:
     name: Validate distributions

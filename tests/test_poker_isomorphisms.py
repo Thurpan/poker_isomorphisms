@@ -1,6 +1,8 @@
 """Tests for the public poker-isomorphisms API."""
 
 import unittest
+from hashlib import sha256
+from inspect import Parameter, signature
 from itertools import combinations, permutations
 from pathlib import Path
 
@@ -50,6 +52,17 @@ def reference_physical_flops(flop: str) -> set[str]:
     return results
 
 
+def reference_normal_form(flop: str) -> str:
+    """Select a normal form without using the package normaliser."""
+    return min(
+        reference_physical_flops(flop),
+        key=lambda board: tuple(
+            CARD_POSITIONS[board[index : index + 2]]
+            for index in range(0, 6, 2)
+        ),
+    )
+
+
 class FlopNormaliseTests(unittest.TestCase):
     def test_normalises_documented_examples(self) -> None:
         examples = {
@@ -94,22 +107,44 @@ class FlopNormaliseTests(unittest.TestCase):
 
 
 class FlopIsomorphismsTests(unittest.TestCase):
-    def test_matches_reference_suit_permutations(self) -> None:
-        representatives = (
-            "AsKsQs",
-            "AsKhQh",
-            "AsKhQd",
-            "AsAhKs",
-            "AsAhKd",
-            "AsAhAd",
-        )
+    def test_matches_reference_order_and_suit_permutations(self) -> None:
+        # Digests capture the complete 0.5 result order at commit 935a769.
+        legacy_results = {
+            "AsKsQs": (
+                24,
+                "b74541ad01289c228ed2c71051183b111d906ddd618923c55d437d8203724c33",
+            ),
+            "AsKhQh": (
+                72,
+                "6eba3ed6908e0934db89ae24c9adbdf43b736a0e31efceba05c1ff84536e5e23",
+            ),
+            "AsKhQd": (
+                144,
+                "672ae6d9cc01998a50948e2a9d3127ea576dbb8bfbaddb55c99e3d081726a1cf",
+            ),
+            "AsAhKs": (
+                72,
+                "caa4acab12ce7e38ae461dfabae561d5729efbe5945ed2e1629c623d5ea86ca0",
+            ),
+            "AsAhKd": (
+                72,
+                "76adfe2a2fec566e0af5e649e055eed4c3f002795c8ff0ba14bf29c89a30fff7",
+            ),
+            "AsAhAd": (
+                24,
+                "8112af450540c1d32896e1685b05e8ea506c7379d1cb1ab58898e19b221ce507",
+            ),
+        }
 
-        for flop in representatives:
+        for flop, (expected_length, expected_digest) in legacy_results.items():
             with self.subTest(flop=flop):
                 actual = flop_isomorphisms(flop)
-                expected = reference_isomorphisms(flop)
-                self.assertEqual(set(actual), expected)
-                self.assertEqual(len(actual), len(expected))
+                self.assertEqual(set(actual), reference_isomorphisms(flop))
+                self.assertEqual(len(actual), expected_length)
+                actual_digest = sha256(
+                    "\n".join(actual).encode("ascii")
+                ).hexdigest()
+                self.assertEqual(actual_digest, expected_digest)
 
     def test_every_result_has_the_same_normal_form(self) -> None:
         expected = flop_normalise("2dAd2s")
@@ -258,15 +293,22 @@ class BatchNormalisationTests(unittest.TestCase):
 
 
 class NormalFormCatalogueTests(unittest.TestCase):
-    def test_catalogue_matches_exhaustive_normalisation(self) -> None:
+    def test_catalogue_matches_independent_exhaustive_reference(self) -> None:
         catalogue = all_flop_normal_forms()
-        expected = {
-            flop_normalise("".join(cards)) for cards in combinations(DECK, 3)
-        }
+        expected = sorted(
+            {
+                reference_normal_form("".join(cards))
+                for cards in combinations(DECK, 3)
+            },
+            key=lambda flop: tuple(
+                CARD_POSITIONS[flop[index : index + 2]]
+                for index in range(0, 6, 2)
+            ),
+        )
 
         self.assertEqual(len(catalogue), 1755)
         self.assertEqual(len(set(catalogue)), 1755)
-        self.assertEqual(set(catalogue), expected)
+        self.assertEqual(catalogue, expected)
 
     def test_returns_a_fresh_deterministic_list(self) -> None:
         first = all_flop_normal_forms()
@@ -309,6 +351,56 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertEqual(__version__, "1.0.0")
         self.assertTrue(expected_names.issubset(poker_isomorphisms.__all__))
 
+    def test_preserves_stable_public_signatures(self) -> None:
+        positional = Parameter.POSITIONAL_OR_KEYWORD
+        keyword_only = Parameter.KEYWORD_ONLY
+        required = Parameter.empty
+        flop_parameters = (
+            ("flop", positional, required),
+            ("with_spaces", positional, None),
+            ("suits_order", positional, SUITS),
+            ("rank_order", positional, RANKS),
+        )
+        expected_parameters = {
+            "flop_normalise": flop_parameters,
+            "flop_normalize": flop_parameters,
+            "flop_isomorphisms": flop_parameters,
+            "flop_isomorphism_class": flop_parameters,
+            "flops_are_isomorphic": (
+                ("flop_a", positional, required),
+                ("flop_b", positional, required),
+                ("suits_order", keyword_only, SUITS),
+                ("rank_order", keyword_only, RANKS),
+            ),
+            "normalise_flops": (
+                ("flops", positional, required),
+                ("with_spaces", keyword_only, False),
+                ("suits_order", keyword_only, SUITS),
+                ("rank_order", keyword_only, RANKS),
+            ),
+            "normalize_flops": (
+                ("flops", positional, required),
+                ("with_spaces", keyword_only, False),
+                ("suits_order", keyword_only, SUITS),
+                ("rank_order", keyword_only, RANKS),
+            ),
+            "all_flop_normal_forms": (
+                ("with_spaces", keyword_only, False),
+                ("suits_order", keyword_only, SUITS),
+                ("rank_order", keyword_only, RANKS),
+            ),
+        }
+
+        for name, expected in expected_parameters.items():
+            with self.subTest(name=name):
+                parameters = tuple(
+                    (parameter.name, parameter.kind, parameter.default)
+                    for parameter in signature(
+                        getattr(poker_isomorphisms, name)
+                    ).parameters.values()
+                )
+                self.assertEqual(parameters, expected)
+
     def test_includes_typing_marker(self) -> None:
         package_directory = Path(poker_isomorphisms.__file__).parent
 
@@ -327,25 +419,39 @@ class InputValidationTests(unittest.TestCase):
             "AS Kh Qd",
         )
 
-        for function in (flop_normalise, flop_isomorphisms):
+        for function in (
+            flop_normalise,
+            flop_isomorphisms,
+            flop_isomorphism_class,
+        ):
             for flop in invalid_flops:
                 with self.subTest(function=function.__name__, flop=flop):
                     with self.assertRaises(ValueError):
                         function(flop)
 
     def test_rejects_non_string_flops(self) -> None:
-        for function in (flop_normalise, flop_isomorphisms):
+        for function in (
+            flop_normalise,
+            flop_isomorphisms,
+            flop_isomorphism_class,
+        ):
             with self.subTest(function=function.__name__):
                 with self.assertRaisesRegex(TypeError, "flop must be a string"):
                     function(None)  # type: ignore[arg-type]
 
     def test_rejects_invalid_with_spaces_values(self) -> None:
         for value in (0, 1, "yes"):
-            with self.subTest(value=value):
-                with self.assertRaisesRegex(TypeError, "with_spaces"):
-                    flop_normalise(
-                        "AsKhQd", with_spaces=value  # type: ignore[arg-type]
-                    )
+            for function in (
+                flop_normalise,
+                flop_isomorphisms,
+                flop_isomorphism_class,
+            ):
+                with self.subTest(function=function.__name__, value=value):
+                    with self.assertRaisesRegex(TypeError, "with_spaces"):
+                        function(
+                            "AsKhQd",
+                            with_spaces=value,  # type: ignore[arg-type]
+                        )
 
     def test_rejects_invalid_orders(self) -> None:
         with self.assertRaisesRegex(ValueError, "suits_order"):

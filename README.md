@@ -247,7 +247,9 @@ behaviour, and valid-input result ordering. A necessary breaking change will
 require a new major version.
 
 The American spelling `flop_normalize` remains an alias of `flop_normalise`.
-See the [changelog](CHANGELOG.md) for release details.
+See the
+[changelog](https://github.com/Thurpan/poker_isomorphisms/blob/main/CHANGELOG.md)
+for release details.
 
 For broader background, see the explanations from
 [GTO Wizard](https://gtowizard.com/glossary/isomorphic/) and
@@ -282,12 +284,16 @@ python -m twine check dist/*
 
 The tests compare representative flops with an independent suit-permutation
 implementation. They also verify that all 22,100 legal flops produce exactly
-1,755 normal forms. GitHub Actions runs these tests on Python 3.10 through 3.14
-and validates the release artefacts. It does not publish to PyPI.
+1,755 normal forms. GitHub Actions tests the installed package on Python 3.10
+through 3.14. It also builds, validates, and uploads candidate release
+artefacts. Publish only the `python-distributions` artefact from the successful
+run for the release commit. Do not rebuild the distributions after validation.
+GitHub Actions does not publish to PyPI.
 
 ## Licence
 
-This project uses the [MIT Licence](LICENSE).
+This project uses the
+[MIT Licence](https://github.com/Thurpan/poker_isomorphisms/blob/main/LICENSE).
 
 ## Author
 

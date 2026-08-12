@@ -2,6 +2,15 @@
 
 This file records notable changes to the project.
 
+## Unreleased
+
+### Maintenance
+
+- Made the Python version matrix test the installed package.
+- Added independent regression checks for public signatures and result order.
+- Corrected documentation links in the Python Package Index description.
+- Required future releases to publish the exact distributions validated by CI.
+
 ## 1.0.0 - 2026-07-31
 
 ### Added
