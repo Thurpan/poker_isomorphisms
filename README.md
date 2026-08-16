@@ -269,6 +269,21 @@ Run the test suite:
 python -m unittest discover -s tests -v
 ```
 
+Install the JavaScript and TypeScript lint tooling:
+
+```console
+npm ci
+```
+
+Run the anti-slop lint rules:
+
+```console
+npm run lint
+```
+
+Anti-slop linting applies to repository-owned JavaScript and TypeScript files.
+It does not affect the Python package runtime.
+
 Install the release-validation tools:
 
 ```console
